@@ -17,12 +17,12 @@ export const getBatchById = async (batchId: number): Promise<Batch | null> => {
     const batch = results[0];
     return {
       ...batch,
-      purchase_price: parseFloat(batch.purchase_price), // Convert numeric to number
-      expiration_date: new Date(batch.expiration_date), // Convert string back to Date
-      received_date: new Date(batch.received_date) // Convert string back to Date
+      purchase_price: parseFloat(batch.purchase_price), // Convert string to number
+      expiration_date: new Date(batch.expiration_date), // Convert string to Date
+      received_date: new Date(batch.received_date) // Convert string to Date
     };
   } catch (error) {
-    console.error('Failed to get batch by ID:', error);
+    console.error('Batch retrieval failed:', error);
     throw error;
   }
 };

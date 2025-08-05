@@ -21,7 +21,8 @@ import type {
   CreateTransactionInput, 
   CreateTransactionItemInput,
   TransactionType,
-  PaymentMethod
+  PaymentMethod,
+  Batch
 } from '../../../server/src/schema';
 
 interface CartItem {
@@ -30,6 +31,8 @@ interface CartItem {
   unitPrice: number;
   discount: number;
   subtotal: number;
+  selectedBatchId: number | null;
+  availableBatches: Batch[];
 }
 
 interface POSInterfaceProps {
@@ -71,25 +74,41 @@ export function POSInterface({ drugs, onRefreshData }: POSInterfaceProps) {
   }, [drugs]);
 
   // Add item to cart
-  const addToCart = (drug: Drug) => {
+  const addToCart = async (drug: Drug) => {
     const existingItem = cart.find(item => item.drug.id === drug.id);
     
     if (existingItem) {
       updateCartItem(drug.id, existingItem.quantity + 1);
     } else {
-      const unitPrice = transactionType === 'prescription' 
-        ? drug.prescription_price 
-        : drug.general_price;
-      
-      const newItem: CartItem = {
-        drug,
-        quantity: 1,
-        unitPrice,
-        discount: 0,
-        subtotal: unitPrice
-      };
-      
-      setCart(prev => [...prev, newItem]);
+      try {
+        // Fetch available batches for the drug
+        const batchesForDrug = await trpc.getBatchesByDrug.query(drug.id);
+        
+        if (batchesForDrug.length === 0) {
+          alert(`No stock available for ${drug.name}.`);
+          return;
+        }
+        
+        const unitPrice = transactionType === 'prescription' 
+          ? drug.prescription_price 
+          : drug.general_price;
+        
+        const newItem: CartItem = {
+          drug,
+          quantity: 1,
+          unitPrice,
+          discount: 0,
+          subtotal: unitPrice,
+          selectedBatchId: batchesForDrug[0].id, // Select first batch (oldest expiration)
+          availableBatches: batchesForDrug
+        };
+        
+        setCart(prev => [...prev, newItem]);
+      } catch (error) {
+        console.error('Failed to fetch batches:', error);
+        alert('Failed to check stock availability. Please try again.');
+        return;
+      }
     }
     setSearchTerm('');
     setSearchResults([]);
@@ -165,10 +184,14 @@ export function POSInterface({ drugs, onRefreshData }: POSInterfaceProps) {
 
       // Create transaction items
       for (const item of cart) {
+        if (!item.selectedBatchId) {
+          throw new Error(`No batch selected for ${item.drug.name}`);
+        }
+        
         const itemData: CreateTransactionItemInput = {
           transaction_id: transaction.id,
           drug_id: item.drug.id,
-          batch_id: 1, // Hardcoded for now - implement batch selection later
+          batch_id: item.selectedBatchId,
           quantity: item.quantity,
           unit_price: item.unitPrice,
           discount_amount: item.discount,
@@ -185,7 +208,8 @@ export function POSInterface({ drugs, onRefreshData }: POSInterfaceProps) {
       alert(`Transaction completed successfully!\nTransaction ID: ${transaction.id}\nTotal: ${formatCurrency(totalAmount)}`);
     } catch (error) {
       console.error('Transaction failed:', error);
-      alert('Transaction failed. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Transaction failed. Please try again.';
+      alert(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -355,12 +379,18 @@ export function POSInterface({ drugs, onRefreshData }: POSInterfaceProps) {
             ) : (
               <>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {cart.map((item) => (
+                  {cart.map((item) => {
+                    const selectedBatch = item.availableBatches.find(batch => batch.id === item.selectedBatchId);
+                    
+                    return (
                     <div key={item.drug.id} className="p-3 border border-gray-200 rounded-lg">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
                           <h4 className="font-semibold text-sm">{item.drug.name}</h4>
                           <p className="text-xs text-gray-600">{item.drug.producer}</p>
+                          {selectedBatch && (
+                            <p className="text-xs text-blue-600">Batch: {selectedBatch.batch_number}</p>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -412,7 +442,8 @@ export function POSInterface({ drugs, onRefreshData }: POSInterfaceProps) {
                         <span className="text-xs text-gray-500">discount</span>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <Separator />
