@@ -1,9 +1,24 @@
 
+import { db } from '../db';
+import { drugsTable } from '../db/schema';
 import { type Drug } from '../schema';
 
 export const getDrugs = async (): Promise<Drug[]> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all drugs from the database with their
-    // current stock levels and pricing information for inventory management.
-    return [];
+  try {
+    const results = await db.select()
+      .from(drugsTable)
+      .execute();
+
+    // Convert numeric fields back to numbers
+    return results.map(drug => ({
+      ...drug,
+      purchase_price: parseFloat(drug.purchase_price),
+      prescription_price: parseFloat(drug.prescription_price),
+      general_price: parseFloat(drug.general_price),
+      insurance_price: parseFloat(drug.insurance_price)
+    }));
+  } catch (error) {
+    console.error('Failed to fetch drugs:', error);
+    throw error;
+  }
 };

@@ -1,17 +1,26 @@
 
+import { db } from '../db';
+import { suppliersTable } from '../db/schema';
 import { type CreateSupplierInput, type Supplier } from '../schema';
 
 export const createSupplier = async (input: CreateSupplierInput): Promise<Supplier> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new supplier record for
-    // procurement and purchase order management.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+  try {
+    // Insert supplier record
+    const result = await db.insert(suppliersTable)
+      .values({
         name: input.name,
         contact_person: input.contact_person,
         phone: input.phone,
         email: input.email,
-        address: input.address,
-        created_at: new Date()
-    } as Supplier);
+        address: input.address
+      })
+      .returning()
+      .execute();
+
+    const supplier = result[0];
+    return supplier;
+  } catch (error) {
+    console.error('Supplier creation failed:', error);
+    throw error;
+  }
 };
