@@ -23,6 +23,7 @@ import { createDrug } from './handlers/create_drug';
 import { getDrugs } from './handlers/get_drugs';
 import { createBatch } from './handlers/create_batch';
 import { getBatchesByDrug } from './handlers/get_batches_by_drug';
+import { getBatchById } from './handlers/get_batch_by_id';
 import { createTransaction } from './handlers/create_transaction';
 import { createTransactionItem } from './handlers/create_transaction_item';
 import { getLowStockDrugs } from './handlers/get_low_stock_drugs';
@@ -70,6 +71,10 @@ const appRouter = router({
   getBatchesByDrug: publicProcedure
     .input(z.number())
     .query(({ input }) => getBatchesByDrug(input)),
+  
+  getBatchById: publicProcedure
+    .input(z.number())
+    .query(({ input }) => getBatchById(input)),
   
   getExpiringBatches: publicProcedure
     .input(z.number().optional().default(6))
